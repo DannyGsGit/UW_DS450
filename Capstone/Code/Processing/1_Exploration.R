@@ -80,6 +80,13 @@ int.columns <- which(data.types != "factor")
 cat.columns <- which(data.types == "factor")
 
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#### Export dataset for feature engineering ####
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+save(my.data, file = "./Data/Processed/1_Post_Cleansing.RData")
+
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #### Relationship Plots ####
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -109,20 +116,34 @@ print(eta.sq.plot)
 set.seed(123)
 
 # Generate modeling dataset using log-sale price
-model.data <- my.data %>% mutate(log.SalePrice = log(SalePrice)) %>% select(-SalePrice)
+model.data <- my.data %>%
+  mutate(log.SalePrice = log(SalePrice)) %>%
+  select(-SalePrice, -Utilities)
 
 # Split the data
-splits <- caret::createDataPartition(y = model.data$log.SalePrice, p = 0.7, list = FALSE)
+splits <- caret::createDataPartition(y = model.data$log.SalePrice, p = 0.6, list = FALSE)
 train.data <- model.data[splits,]
 test.data <- model.data[-splits,]
+
+# Inspect the splits
+data.inspect <- model.data
+data.inspect$split <- "test"
+data.inspect$split[splits] <- "train"
+# Plot
+lattice::histogram(~Condition1|split, data = data.inspect,
+                   layout = c(1,2))
+lattice::histogram(~Condition2|split, data = data.inspect,
+                   layout = c(1,2))
+
 
 # Train the linear model
 initial.model <- lm(log.SalePrice ~ ., train.data)
 summary(initial.model)
 
 # Evaluate RMSE on training set
-test.data <- test.data %>% filter(Condition2 != "Artery", Condition2 != "PosA", RoofMatl != "Roll",
-                                  Foundation != "Wood")  # Band-aid fix for new levels
+test.data <- test.data %>% filter(Condition2 != "Artery", Condition2 != "PosA", 
+                                  Condition1 != "RRNe", RoofMatl != "Roll",
+                                  Foundation != "Wood", Condition2 != "PosN")  # Band-aid fix for new levels
 test.data$pred.SalePrice <- predict(initial.model, test.data)
 rmse <- sqrt(mean((test.data$log.SalePrice - test.data$pred.SalePrice)^2))
 print(rmse)
