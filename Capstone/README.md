@@ -6,4 +6,5 @@
 * Look for MIL units based on basement kitchen/bath data
 * Collapse porch features
 * Lot size adjusted to neighborhood
+* Flag luxury properties?
 * Disproportionate Old Town, Crawford, Edwards, and BrkSide neighborhood outliers
