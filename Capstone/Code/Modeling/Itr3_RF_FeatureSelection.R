@@ -70,7 +70,7 @@ test.target <- target[-splits]
 # Train
 fit <- randomForest(x = train.features, y = train.target,
                     importance = TRUE,
-                    ntree = 1000)
+                    ntree = 100)
 
 
 ## View variable importance
