@@ -102,93 +102,24 @@ my.data <- my.data %>% mutate(log.sale.price = log(SalePrice))
 
 
 
-#### 1- Neighborhood binned by saleprice ####
-neighborhood.plot <- ggplot(my.data, aes(x = Neighborhood, y = log.sale.price)) +
-  geom_boxplot()
-neighborhood.plot
-
-# Summary stats by neighborhood
-mean.log.sale <- mean(my.data$log.sale.price)
-neighborhood.summary <- my.data %>% group_by(Neighborhood) %>%
-  summarise(mean.log.price = mean(log.sale.price) - mean.log.sale,
-            sd.log.price = sd(log.sale.price),
-            count = n()) %>%
-  ungroup()
-
-# Group neighborhoods by sale price
-neighborhood.quantiles <- quantile(neighborhood.summary$mean.log.price, probs = c(seq(0, 1, 0.15), 1))
-neighborhood.summary$neighborhood.binned <- cut(neighborhood.summary$mean.log.price, neighborhood.quantiles, include.lowest = TRUE)
-
-neighborhood.plot.2 <- ggplot(neighborhood.summary, aes(Neighborhood, mean.log.price)) +
-  geom_bar(stat = "identity", aes(fill = neighborhood.binned))
-neighborhood.plot.2
-
-# Apply groupings to dataset
-neighborhood.summary <- neighborhood.summary %>% select(neighborhood.binned, Neighborhood)
-my.data <- left_join(my.data, neighborhood.summary, by = "Neighborhood")
-
-
-
 
 
 #### 1.1- Simply cut-off neighborhoods by # of sales ####
 
-my.data$Neighborhood.cutoff <- cutoff_by_size(my.data$Neighborhood, cutoff = co.level) %>% as.factor()
-lattice::histogram(my.data$Neighborhood.cutoff)
-
-
-
-
-
-#### 2- Bin Condition 1 ####
-# Set categories by positive and negative conditions
-positive.conditions <- c("PosA", "PosN")
-negative.conditions <- c("Artery", "Feedr", "RRAe", "RRAn", "RRNe", "RRNn")
-
-# Apply bins
-my.data <- my.data %>% mutate(Condition1.binned = ifelse(Condition1 %in% positive.conditions, 1,
-                                                         ifelse(Condition1 %in% negative.conditions, -1, 0)))
-
-# Inspect results
-lattice::histogram(~Condition1, data = my.data)
-lattice::histogram(~Condition1.binned, data = my.data)
+my.data$Neighborhood <- cutoff_by_size(my.data$Neighborhood, cutoff = co.level) %>% as.factor()
+# lattice::histogram(my.data$Neighborhood)
 
 
 
 
 
 
-#### 3- MSSubClass ####
-lattice::histogram(~MSSubClass, data = my.data)
 
-mssub.plot <- ggplot(my.data, aes(x = MSSubClass, y = log.sale.price)) +
-  geom_boxplot()
-mssub.plot
-
-mean.log.sale <- mean(my.data$log.sale.price)
-mssub.summary <- my.data %>% group_by(MSSubClass) %>%
-  summarise(mean.log.price = mean(log.sale.price) - mean.log.sale,
-            sd.log.price = sd(log.sale.price),
-            count = n()) %>%
-  ungroup()
-
-# Break up the MSSubClasses by mean log price
-mssub.quantiles <- quantile(mssub.summary$mean.log.price, probs = c(seq(0, 1, 0.15), 1))
-mssub.summary$mssub.binned <- cut(mssub.summary$mean.log.price, mssub.quantiles, include.lowest = TRUE)
-
-# Look at the groupings
-mssub.summary.plot <- ggplot(mssub.summary, aes(MSSubClass, mean.log.price)) +
-  geom_bar(stat = "identity", aes(fill = mssub.binned))
-mssub.summary.plot
-
-# Apply groupings to original dataset
-mssub.summary <-  mssub.summary %>% select(MSSubClass, mssub.binned)
-my.data <- left_join(my.data, mssub.summary, by = "MSSubClass")
 
 
 #### 3.1- MSSubClass ####
 # lattice::histogram(my.data$MSSubClass)
-my.data$MSSubClass.cutoff <- cutoff_by_size(my.data$MSSubClass, cutoff = co.level) %>% as.factor()
+my.data$MSSubClass <- cutoff_by_size(my.data$MSSubClass, cutoff = co.level) %>% as.factor()
 # lattice::histogram(my.data$MSSubClass.cutoff)
 
 
@@ -196,17 +127,9 @@ my.data$MSSubClass.cutoff <- cutoff_by_size(my.data$MSSubClass, cutoff = co.leve
 
 
 
-
-#### 4- Alley ####
-my.data <- my.data %>% mutate(alley.binned = ifelse(Alley == "None", "None", "Alley"))
-my.data$alley.binned <- as.factor(my.data$alley.binned)
-
-
-
-
 #### 5- Exterior1st ####
 # lattice::histogram(my.data$Exterior1st)
-my.data$Exterior1st.cutoff <- cutoff_by_size(my.data$Exterior1st, cutoff = co.level) %>% as.factor()
+my.data$Exterior1st <- cutoff_by_size(my.data$Exterior1st, cutoff = co.level) %>% as.factor()
 # lattice::histogram(my.data$Exterior1st.cutoff)
 
 
@@ -214,7 +137,7 @@ my.data$Exterior1st.cutoff <- cutoff_by_size(my.data$Exterior1st, cutoff = co.le
 
 #### 6- SaleType ####
 # lattice::histogram(my.data$SaleType)
-my.data$SaleType.cutoff <- cutoff_by_size(my.data$SaleType, cutoff = co.level) %>% as.factor()
+my.data$SaleType <- cutoff_by_size(my.data$SaleType, cutoff = co.level) %>% as.factor()
 # lattice::histogram(my.data$SaleType.cutoff)
 
 
@@ -222,7 +145,7 @@ my.data$SaleType.cutoff <- cutoff_by_size(my.data$SaleType, cutoff = co.level) %
 
 #### 7- HouseStyle ####
 # lattice::histogram(my.data$HouseStyle)
-my.data$HouseStyle.cutoff <- cutoff_by_size(my.data$HouseStyle, cutoff = co.level) %>% as.factor()
+my.data$HouseStyle <- cutoff_by_size(my.data$HouseStyle, cutoff = co.level) %>% as.factor()
 # lattice::histogram(my.data$HouseStyle.cutoff)
 
 
@@ -230,27 +153,27 @@ my.data$HouseStyle.cutoff <- cutoff_by_size(my.data$HouseStyle, cutoff = co.leve
 
 #### 8- Functional ####
 # lattice::histogram(my.data$Functional)
-my.data$Functional.cutoff <- cutoff_by_size(my.data$Functional, cutoff = co.level) %>% as.factor()
+my.data$Functional <- cutoff_by_size(my.data$Functional, cutoff = co.level) %>% as.factor()
 # lattice::histogram(my.data$Functional.cutoff)
 
 
 #### 9- GarageType ####
 # lattice::histogram(my.data$GarageType)
-my.data$GarageType.cutoff <- cutoff_by_size(my.data$GarageType, cutoff = co.level) %>% as.factor()
+my.data$GarageType <- cutoff_by_size(my.data$GarageType, cutoff = co.level) %>% as.factor()
 # lattice::histogram(my.data$GarageType.cutoff)
 
 
 
 #### 10- RoofStyle ####
 # lattice::histogram(my.data$RoofStyle)
-my.data$RoofStyle.cutoff <- cutoff_by_size(my.data$RoofStyle, cutoff = co.level) %>% as.factor()
+my.data$RoofStyle <- cutoff_by_size(my.data$RoofStyle, cutoff = co.level) %>% as.factor()
 # lattice::histogram(my.data$RoofStyle.cutoff)
 
 
 
 #### 11- FireplaceQu ####
 #lattice::histogram(my.data$FireplaceQu)
-my.data$FireplaceQu.cutoff <- cutoff_by_size(my.data$FireplaceQu, cutoff = co.level) %>% as.factor()
+my.data$FireplaceQu <- cutoff_by_size(my.data$FireplaceQu, cutoff = co.level) %>% as.factor()
 #lattice::histogram(my.data$FireplaceQu.cutoff)
 
 
@@ -258,7 +181,7 @@ my.data$FireplaceQu.cutoff <- cutoff_by_size(my.data$FireplaceQu, cutoff = co.le
 
 #### 12- GarageQual ####
 # lattice::histogram(my.data$GarageQual)
-my.data$GarageQual.cutoff <- cutoff_by_size(my.data$GarageQual, cutoff = .05) %>% as.factor()
+my.data$GarageQual <- cutoff_by_size(my.data$GarageQual, cutoff = .05) %>% as.factor()
 # lattice::histogram(my.data$GarageQual.cutoff)
 
 
@@ -266,7 +189,7 @@ my.data$GarageQual.cutoff <- cutoff_by_size(my.data$GarageQual, cutoff = .05) %>
 
 #### 13- SaleCond ####
 # lattice::histogram(my.data$SaleCondition)
-my.data$SaleCondition.cutoff <- cutoff_by_size(my.data$SaleCondition, cutoff = co.level) %>% as.factor()
+my.data$SaleCondition <- cutoff_by_size(my.data$SaleCondition, cutoff = co.level) %>% as.factor()
 # lattice::histogram(my.data$SaleCondition.cutoff)
 
 
@@ -275,42 +198,36 @@ my.data$SaleCondition.cutoff <- cutoff_by_size(my.data$SaleCondition, cutoff = c
 
 #### 14- MSZoning ####
 # lattice::histogram(my.data$MSZoning)
-my.data$MSZoning.cutoff <- cutoff_by_size(my.data$MSZoning, cutoff = .05) %>% as.factor()
+my.data$MSZoning <- cutoff_by_size(my.data$MSZoning, cutoff = .05) %>% as.factor()
 # lattice::histogram(my.data$MSZoning.cutoff)
 
-
-
-# #### 15- BsmtQual ####  [[[Deprecated]]]
-# lattice::histogram(my.data$BsmtQual)
-# my.data$BsmtQual.cutoff <- cutoff_by_size(my.data$BsmtQual, cutoff = co.level) %>% as.factor()
-# lattice::histogram(my.data$BsmtQual.cutoff)
 
 
 
 #### 16- BsmtExposure ####
 # lattice::histogram(my.data$BsmtExposure)
-my.data$BsmtExposure.cutoff <- cutoff_by_size(my.data$BsmtExposure, cutoff = co.level) %>% as.factor()
+my.data$BsmtExposure <- cutoff_by_size(my.data$BsmtExposure, cutoff = co.level) %>% as.factor()
 # lattice::histogram(my.data$BsmtExposure.cutoff)
 
 
 
 #### 17- LotShape ####
 # lattice::histogram(my.data$LotShape)
-my.data$LotShape.cutoff <- cutoff_by_size(my.data$LotShape, cutoff = co.level) %>% as.factor()
+my.data$LotShape <- cutoff_by_size(my.data$LotShape, cutoff = co.level) %>% as.factor()
 # lattice::histogram(my.data$LotShape.cutoff)
 
 
 
 #### 18- MasVnrType ####
 # lattice::histogram(my.data$MasVnrType)
-my.data$MasVnrType.cutoff <- cutoff_by_size(my.data$MasVnrType, cutoff = co.level) %>% as.factor()
+my.data$MasVnrType <- cutoff_by_size(my.data$MasVnrType, cutoff = co.level) %>% as.factor()
 # lattice::histogram(my.data$MasVnrType.cutoff)
 
 
 
 #### 19- KitchenQual ####
 # lattice::histogram(my.data$KitchenQual)
-my.data$KitchenQual.cutoff <- cutoff_by_size(my.data$KitchenQual, cutoff = co.level) %>% as.factor()
+my.data$KitchenQual <- cutoff_by_size(my.data$KitchenQual, cutoff = co.level) %>% as.factor()
 # lattice::histogram(my.data$KitchenQual.cutoff)
 
 

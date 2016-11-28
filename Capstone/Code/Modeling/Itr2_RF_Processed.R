@@ -32,22 +32,22 @@ my.data$log.SalePrice <- log(my.data$SalePrice)
 #~~~~~~~~~~~~~~~~~~~~~~~
 
 ## Break out features and target for cross-validation
-features <- my.data %>% select(MSSubClass.cutoff,
-                               MSZoning.cutoff, LotFrontage,
-                               LotArea, LotShape.cutoff, LotConfig,
-                               Neighborhood.cutoff,HouseStyle.cutoff,
+features <- my.data %>% select(MSSubClass,
+                               MSZoning, LotFrontage,
+                               LotArea, LotShape, LotConfig,
+                               Neighborhood,HouseStyle,
                                OverallQual, OverallCond, YearBuilt,
-                               RoofStyle.cutoff, Exterior1st.cutoff, MasVnrType.cutoff,
-                               MasVnrArea, BsmtQual, BsmtExposure.cutoff,
+                               RoofStyle, Exterior1st, MasVnrType,
+                               MasVnrArea, BsmtQual, BsmtExposure,
                                BsmtFinType1, BsmtFinSF1, BsmtUnfSF, X1stFlrSF,
                                X2ndFlrSF, LowQualFinSF, GrLivArea, BsmtFullBath,
                                BsmtHalfBath, FullBath, HalfBath, BedroomAbvGr,
-                               KitchenAbvGr, KitchenQual.cutoff, TotRmsAbvGrd,
-                               Functional.cutoff, Fireplaces, FireplaceQu.cutoff,
-                               GarageType.cutoff, GarageFinish, GarageCars,
-                               GarageQual.cutoff, GarageCond, WoodDeckSF, OpenPorchSF,
+                               KitchenAbvGr, KitchenQual, TotRmsAbvGrd,
+                               Functional, Fireplaces, FireplaceQu,
+                               GarageType, GarageFinish, GarageCars,
+                               GarageQual, GarageCond, WoodDeckSF, OpenPorchSF,
                                EnclosedPorch, X3SsnPorch, ScreenPorch, PoolArea,
-                               MiscVal, MoSold, YrSold, SaleType.cutoff, SaleCondition.cutoff)
+                               MiscVal, MoSold, YrSold, SaleType, SaleCondition)
 target <- my.data$log.SalePrice
 
 
@@ -75,7 +75,7 @@ test.target <- target[-splits]
 # Train
 fit <- randomForest(x = train.features, y = train.target,
                     importance = TRUE,
-                    ntree = 100)
+                    ntree = 700)
 
 
 ## View variable importance
@@ -119,27 +119,46 @@ competition.data <- read.csv("./Data/Raw/test.csv")
 source("./Code/Modeling/Data_Cleanser.R")
 competition.data <- clean_dataset(competition.data)
 
-## Get categorical columns and compare to training levels
-model.levels <- fit$forest$xlevels
+source("./Code/Modeling/Data_Processor.R")
+competition.data <- align_factors_with_model(model = fit, new.data = competition.data)
+
+## Last check, look for NAs in competition data
+data.types <- sapply(competition.data, class)
+na.investigate <- apply(competition.data, 2, function(x) length(which(is.na(x))))
+data.summary.table <- data.frame(type = data.types, factor.levels = NA, na.count = na.investigate)
+data.summary.table$factor.levels <- sapply(competition.data, function(x) length(levels(x)))
+data.summary.table$in.model <- ifelse(row.names(data.summary.table) %in% names(fit$forest$xlevels), TRUE, FALSE)
+# Check that all model features are in place
+model.check <- data.frame(feature = names(fit$forest$xlevels))
+model.check$in.new.data <- ifelse(model.check$feature %in% colnames(competition.data), TRUE, FALSE)
+
+## Run the prediction
+competition.data <- competition.data %>% select(Id, MSSubClass,
+                               MSZoning, LotFrontage,
+                               LotArea, LotShape, LotConfig,
+                               Neighborhood,HouseStyle,
+                               OverallQual, OverallCond, YearBuilt,
+                               RoofStyle, Exterior1st, MasVnrType,
+                               MasVnrArea, BsmtQual, BsmtExposure,
+                               BsmtFinType1, BsmtFinSF1, BsmtUnfSF, X1stFlrSF,
+                               X2ndFlrSF, LowQualFinSF, GrLivArea, BsmtFullBath,
+                               BsmtHalfBath, FullBath, HalfBath, BedroomAbvGr,
+                               KitchenAbvGr, KitchenQual, TotRmsAbvGrd,
+                               Functional, Fireplaces, FireplaceQu,
+                               GarageType, GarageFinish, GarageCars,
+                               GarageQual, GarageCond, WoodDeckSF, OpenPorchSF,
+                               EnclosedPorch, X3SsnPorch, ScreenPorch, PoolArea,
+                               MiscVal, MoSold, YrSold, SaleType, SaleCondition)
 
 
-# ## Inspect dataset
-# # Build a summary table to target complex categorical columns
-# data.types <- sapply(competition.data, class)
-# 
-# # Investigate missing data
-# na.investigate <- apply(competition.data, 2, function(x) length(which(is.na(x))))
-# 
-# # Build summary table
-# data.summary.table <- data.frame(type = data.types, factor.levels = NA, na.count = na.investigate)
-# data.summary.table$factor.levels <- sapply(competition.data, function(x) length(levels(x)))
-# 
-# 
-# ## Run the prediction
-# competition.data$log.SalePrice <- predict(fit, competition.data)
+competition.data$log.SalePrice <- predict(fit, competition.data)
 
+competition.data <- competition.data %>% mutate(SalePrice = exp(competition.data$log.SalePrice)) %>%
+  select(Id, SalePrice)
 
-
+## Save the results
+write.csv(competition.data, file = "./Data/Submissions/Itr2_RF_Submission.csv",
+          row.names = FALSE)
 
 
 

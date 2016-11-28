@@ -36,7 +36,11 @@ clean_dataset <- function(new.data) {
   new.data$LotFrontage[is.na(new.data$LotFrontage)] <- mean(new.data$LotFrontage, na.rm = TRUE)
   new.data$Electrical[is.na(new.data$Electrical)] <- "SBrkr"  # This is the most common electrical type
   new.data$MasVnrArea[is.na(new.data$MasVnrArea)] <- 0
-  
+  new.data$BsmtFinSF1[is.na(new.data$BsmtFinSF1)] <- 0
+  new.data$BsmtUnfSF[is.na(new.data$BsmtUnfSF)] <- 0
+  new.data$BsmtFullBath[is.na(new.data$BsmtFullBath)] <- 0
+  new.data$BsmtHalfBath[is.na(new.data$BsmtHalfBath)] <- 0
+  new.data$GarageCars[is.na(new.data$GarageCars)] <- 0
 
   
   
