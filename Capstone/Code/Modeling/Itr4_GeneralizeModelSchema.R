@@ -70,9 +70,9 @@ target <- my.data$log.SalePrice
 
 
 
-#~~~~~~~~~~~~~~~~~~~~~~~
-#### Train ####
-#~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#### Generate Train/Test Splits ####
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Split the data
 splits <- caret::createDataPartition(y = my.data$log.SalePrice, p = 0.8, list = FALSE)
@@ -84,34 +84,34 @@ test.features <- features[-splits,]
 test.target <- target[-splits]
 
 
-# Train
+
+#~~~~~~~~~~~~~~~~~~~~~~
+#### Random Forest ####
+#~~~~~~~~~~~~~~~~~~~~~~
+
+### Train
+
 fit <- randomForest(x = train.features, y = train.target,
                     importance = TRUE,
-                    ntree = 100)
+                    ntree = 500)
 
 
-## View variable importance
-feature.importance <- as.data.frame(fit$importance)
-save(feature.importance, file = "./Docs/Models/Itr4/VariableImportance.RData")
-
-# Plot importance
-feature.importance$feature <- row.names(feature.importance)
-colnames(feature.importance) <- c("PctIncMSE", "GiniImpurity", "Feature")
-feature.importance$Feature <- factor(feature.importance$Feature, levels = feature.importance$Feature[order(feature.importance$PctIncMSE)])
-
-feature.importance.plot <- ggplot(feature.importance, aes(Feature, PctIncMSE)) +
-  geom_bar(stat = "identity") +
-  coord_flip()
-feature.importance.plot
-
-
+# ## View variable importance
+# feature.importance <- as.data.frame(fit$importance)
+# save(feature.importance, file = "./Docs/Models/Itr4/VariableImportance.RData")
+# 
+# # Plot importance
+# feature.importance$feature <- row.names(feature.importance)
+# colnames(feature.importance) <- c("PctIncMSE", "GiniImpurity", "Feature")
+# feature.importance$Feature <- factor(feature.importance$Feature, levels = feature.importance$Feature[order(feature.importance$PctIncMSE)])
+# 
+# feature.importance.plot <- ggplot(feature.importance, aes(Feature, PctIncMSE)) +
+#   geom_bar(stat = "identity") +
+#   coord_flip()
+# feature.importance.plot
 
 
-
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#### Prediction & Evaluation ####
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### Test
 
 test.data <- test.features
 test.data$pred.log.SalePrice <- predict(fit, test.data)
@@ -120,14 +120,13 @@ test.data <- test.data %>% mutate(pred.SalePrice = exp(pred.log.SalePrice),
                                   SalePrice = exp(log.SalePrice),
                                   residuals = SalePrice - pred.SalePrice)
 
+
 # Calculate RMSE
 RMSE <- sqrt(mean(test.data$residuals ^ 2))
 print(RMSE)
 
-test.data <- test.data %>% mutate(pct.residuals = abs(residuals/SalePrice),
-                                  outlier = ifelse(pct.residuals > 0.25, "TRUE", "FALSE"))
-
-
+# test.data <- test.data %>% mutate(pct.residuals = abs(residuals/SalePrice),
+#                                   outlier = ifelse(pct.residuals > 0.25, "TRUE", "FALSE"))
 
 
 
