@@ -1,6 +1,8 @@
-#### Random Forest Model ####
-## This model is trained with cleansed, but not feature-engineered data 
-## to set a baseline performance.
+#### Iteration 2- Random Forest Model ####
+## This is a basic random forest, trained with processed data that has been:
+## * All missing values removed
+## * For factors, levels with small numbers of samples (typ < 3% of total) are re-labeled "Other"
+## * Obviously information-deficient features have been dropped
 
 
 library(randomForest)
@@ -52,7 +54,7 @@ target <- my.data$log.SalePrice
 
 
 # ## Run the cross-validation
-# cv.training <- rfcv(train.features, train.target, cv.fold = 10)
+# cv.training <- rfcv(features, target, cv.fold = 10)
 # 
 # ## Plot the cv error by number of vars
 # with(cv.training, plot(n.var, error.cv, type="b", col="red"))
@@ -80,7 +82,7 @@ fit <- randomForest(x = train.features, y = train.target,
 
 ## View variable importance
 feature.importance <- as.data.frame(fit$importance)
-
+save(feature.importance, file = "./Docs/Models/Itr2/VariableImportance.RData")
 
 
 

@@ -1,6 +1,11 @@
 # Administrative
 
 ## To do list:
-* Cross-validate random forest on clean data w/ no feature engineering
-* Cross-validate random forest on processed data (some feature engineering)
-* Train a model and submit to Kaggle
+* Train xgboost
+* Writeup UW report
+---------
+* Verify whether unfinished basement/garage are included in total square footage
+* Look for MIL units based on basement kitchen/bath data
+* Collapse porch features
+* Lot size adjusted to neighborhood
+* Disproportionate Old Town, Crawford, Edwards, and BrkSide neighborhood outliers

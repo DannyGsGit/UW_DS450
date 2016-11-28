@@ -33,6 +33,7 @@ data.summary.table$factor.levels <- sapply(my.data, function(x) length(levels(x)
 
 
 # lattice::histogram(my.data$Neighborhood)  # Bin by mean sale price/ cutoff by size
+# lattice::histogram(~ SalePrice|Neighborhood, data = my.data)
 # lattice::histogram(my.data$Exterior2nd)  # Drop
 # lattice::histogram(my.data$MSSubClass)  # Bin by mean sale/ cutoff by size
 # lattice::histogram(my.data$Exterior1st)  # Cutoff by size
@@ -91,7 +92,7 @@ my.data <- my.data %>% select(-Street, -Utilities, -PavedDrive, - GarageArea,
 
 
 # Set standard threshold for cutoff by size
-co.level <- 0.03
+co.level <- 0.02
 
 
 
@@ -227,7 +228,7 @@ my.data$MasVnrType <- cutoff_by_size(my.data$MasVnrType, cutoff = co.level) %>% 
 
 #### 19- KitchenQual ####
 # lattice::histogram(my.data$KitchenQual)
-my.data$KitchenQual <- cutoff_by_size(my.data$KitchenQual, cutoff = co.level) %>% as.factor()
+my.data$KitchenQual <- cutoff_by_size(my.data$KitchenQual, cutoff = 0.3) %>% as.factor()
 # lattice::histogram(my.data$KitchenQual.cutoff)
 
 
