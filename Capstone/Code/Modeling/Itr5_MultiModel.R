@@ -8,7 +8,7 @@ library(dplyr)
 library(ggplot2)
 
 
-set.seed(206)
+set.seed(12387564754)
 
 
 
@@ -28,7 +28,7 @@ load("./Data/Processed/2_ProcessedData.RData")
 ## Break out features
 feature.list <- c("GrLivArea", "OverallQual", "YearBuilt", "X1stFlrSF",
                   "KitchenQual", "Neighborhood", "GarageCars", "BsmtFinType1",
-                  "MSSubClass", "BsmtQual", "X2ndFlrSF", "LotArea",
+                  "MSSubClass", "BsmtQual", "LotArea",
                   "GarageType", "FireplaceQu", "GarageFinish", "OverallCond",
                   "Fireplaces", "Exterior1st", "FullBath",
                   "LotFrontage", "TotRmsAbvGrd", "MSZoning", "BsmtUnfSF",
@@ -36,6 +36,8 @@ feature.list <- c("GrLivArea", "OverallQual", "YearBuilt", "X1stFlrSF",
                   "WoodDeckSF", "MasVnrArea", "HalfBath", "GarageQual",
                   "BsmtFullBath", "GarageCond", "SaleCondition", "LotShape",
                   "MasVnrType", "KitchenAbvGr", "ScreenPorch", "Functional")
+# Temp Drop: "X2ndFlrSF"
+
 features <- my.data[, feature.list]
 
 
@@ -49,12 +51,52 @@ target <- my.data$log.SalePrice
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #### Feature Engineering ####
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+qqplot_pairs <- function(column) {
+  par(mfrow = c(1,3))
+  car::qqPlot(column, main = "Raw")
+  car::qqPlot(log(column), main = "LogN")
+  car::qqPlot(1 / column, main = "Reciprocal")
+  par(mfrow = c(1,1))
+  hist(column, breaks = 30)
+}
+
+## Log transform some features
+
+# qqplot_pairs(features$GrLivArea)
+# qqplot_pairs(features$X1stFlrSF)
+# qqplot_pairs(features$LotArea)
+# qqplot_pairs(features$TotRmsAbvGrd)
 
 
+feature_engineering <- function(feature.matrix, neighborhood.ref.data) {
+  ## Log transforms
+  feature.matrix <- feature.matrix %>% mutate(GrLivArea = log(GrLivArea),
+                                  X1stFlrSF = log(X1stFlrSF),
+                                  LotArea = log(LotArea),
+                                  TotRmsAbvGrd = log(TotRmsAbvGrd))
+  
+  
+  
+  
+  ## Lot size adjusted by neighborhood
+  neighborhood.lot.sizes <- neighborhood.ref.data %>% group_by(Neighborhood) %>%
+    summarise(mean.nbhd.log.lot.size = mean(log(LotArea))) %>%
+    ungroup()
+  
+  feature.matrix <- left_join(feature.matrix, neighborhood.lot.sizes, by = "Neighborhood")
+  
+  feature.matrix <- feature.matrix %>% mutate(neighborhood.lot.pctile = LotArea / mean.nbhd.log.lot.size) %>%
+    select(-mean.nbhd.log.lot.size)
+  
+  
+  
+  ## Lot coverage
+  feature.matrix <- feature.matrix %>% mutate(lot.coverage = exp(X1stFlrSF) / exp(LotArea))
+  
+  return(feature.matrix)
+}
 
-
-
-
+features <- feature_engineering(feature.matrix = features, neighborhood.ref.data = my.data)
 
 #~~~~~~~~~~~~~~~~~~~~~~~
 #### Cross-validation ####
@@ -91,38 +133,38 @@ test.target <- target[-splits]
 
 ### Train
 
-fit <- randomForest(x = train.features, y = train.target,
+model.rf <- randomForest(x = train.features, y = train.target,
                     importance = TRUE,
-                    ntree = 500)
+                    ntree = 1000)
 
 
-# ## View variable importance
-# feature.importance <- as.data.frame(fit$importance)
+## View variable importance
+feature.importance <- as.data.frame(model.rf$importance)
 # save(feature.importance, file = "./Docs/Models/Itr4/VariableImportance.RData")
-# 
-# # Plot importance
-# feature.importance$feature <- row.names(feature.importance)
-# colnames(feature.importance) <- c("PctIncMSE", "GiniImpurity", "Feature")
-# feature.importance$Feature <- factor(feature.importance$Feature, levels = feature.importance$Feature[order(feature.importance$PctIncMSE)])
-# 
-# feature.importance.plot <- ggplot(feature.importance, aes(Feature, PctIncMSE)) +
-#   geom_bar(stat = "identity") +
-#   coord_flip()
-# feature.importance.plot
+
+# Plot importance
+feature.importance$feature <- row.names(feature.importance)
+colnames(feature.importance) <- c("PctIncMSE", "GiniImpurity", "Feature")
+feature.importance$Feature <- factor(feature.importance$Feature, levels = feature.importance$Feature[order(feature.importance$PctIncMSE)])
+
+feature.importance.plot <- ggplot(feature.importance, aes(Feature, PctIncMSE)) +
+  geom_bar(stat = "identity") +
+  coord_flip()
+feature.importance.plot
 
 
 ### Test
 
 test.data <- test.features
-test.data$pred.log.SalePrice <- predict(fit, test.data)
+test.data$log.SalePrice.RF <- predict(model.rf, test.data)
 test.data$log.SalePrice <- test.target
-test.data <- test.data %>% mutate(pred.SalePrice = exp(pred.log.SalePrice),
-                                  SalePrice = exp(log.SalePrice),
-                                  residuals = SalePrice - pred.SalePrice)
+test.data <- test.data %>% mutate(SalePrice = exp(log.SalePrice),
+                                  SalePrice.RF = exp(log.SalePrice.RF),
+                                  residuals.RF = SalePrice - SalePrice.RF)
 
 
 # Calculate RMSE
-RMSE.rf <- sqrt(mean(test.data$residuals ^ 2))
+RMSE.rf <- sqrt(mean(test.data$residuals.RF ^ 2))
 print(RMSE.rf)
 
 # test.data <- test.data %>% mutate(pct.residuals = abs(residuals/SalePrice),
@@ -143,27 +185,111 @@ xgb.train <- data.matrix(train.features)
 xgb.label <- data.matrix(train.target)
 
 model.xgboost <- xgboost(data = xgb.train, label = xgb.label,
-                         nrounds = 2,
+                         nrounds = 1000,
                          booster = "gbtree",
                          objective = "reg:linear",
                          nthread = 3,
-                         max_depth = 15)
+                         max_depth = 25)
 
 ### Test model
 xgb.test <- data.matrix(test.features)
-preds <- predict(model.xgboost, xgb.test)
+test.data$log.SalePrice.xgb <- predict(model.xgboost, xgb.test)
 
-xgb.results <- data.frame(test.features, test.target, preds)
-xgb.results <- xgb.results %>% mutate(SalePrice = exp(test.target),
-                                      pred.SalePrice = exp(preds),
-                                      residuals = pred.SalePrice - SalePrice,
-                                      pct.residuals = residuals / SalePrice)
+test.data <- test.data %>% mutate(SalePrice.xgb = exp(log.SalePrice.xgb),
+                                  residuals.xgb = SalePrice - SalePrice.xgb)
 
 # Calculate RMSE
-RMSE.xgb <- sqrt(mean(xgb.results$residuals ^ 2))
+RMSE.xgb <- sqrt(mean(test.data$residuals.xgb ^ 2))
 print(RMSE.xgb)
 
-xgb.plot.tree(feature_names = colnames(xgb.train), model = model.xgboost)
+# xgb.plot.tree(feature_names = colnames(xgb.train), model = model.xgboost)
+
+
+
+
+
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#### Linear Model ####
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+## Train the linear model
+lm.data <- data.frame(train.features, log.SalePrice = train.target)
+
+model.lm <- lm(log.SalePrice ~ ., lm.data)
+
+## Run Predictions
+test.data$log.SalePrice.LM <- predict(model.lm, test.data)
+
+## Evaluate
+test.data <- test.data %>% mutate(SalePrice.LM = exp(log.SalePrice.LM),
+                                  residuals.LM = SalePrice - SalePrice.LM)
+
+## Calculate RMSE
+RMSE.LM <- sqrt(mean(test.data$residuals.LM ^ 2))
+print(RMSE.LM)
+
+
+
+
+
+
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#### Parent-level stacked learner ####
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+parent.train.data <- data.frame(log.SalePrice.RF = predict(model.rf, train.features),
+                                log.SalePrice.xgb = predict(model.xgboost, xgb.train),
+                                log.SalePrice.LM = predict(model.lm, train.features))
+
+
+#### Try with RF ####
+## Train stacked learner based on lower-level model outputs
+stacked.model <- randomForest(x = parent.train.data, y = train.target,
+                                  importance = TRUE,
+                                  ntree = 50)
+
+## Run predictions
+test.data$log.SalePrice.stack.RF <- predict(stacked.model, test.data)
+
+
+
+
+
+## Evaluate
+test.data <- test.data %>% mutate(SalePrice.stack.RF = exp(log.SalePrice.stack.RF),
+                                  residuals.stack.RF = SalePrice - SalePrice.stack.RF)
+
+# Calculate RMSE
+RMSE.stack.parent <- sqrt(mean(test.data$residuals.stack.RF ^ 2))
+print(RMSE.stack.parent)
+
+
+
+
+
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#### Average of predictions ####
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+test.data <- test.data %>% mutate(log.SalePrice.mean.pred = (log.SalePrice.RF + log.SalePrice.xgb + log.SalePrice.LM) / 3,
+                                  SalePrice.mean.pred = exp(log.SalePrice.mean.pred),
+                                  residuals.mean.pred = SalePrice - SalePrice.mean.pred)
+
+
+# Calculate RMSE
+RMSE.mean.pred <- sqrt(mean(test.data$residuals.mean.pred ^ 2))
+print(RMSE.mean.pred)
+
+
+
+
+
 
 
 
@@ -171,31 +297,47 @@ xgb.plot.tree(feature_names = colnames(xgb.train), model = model.xgboost)
 #### Generate Kaggle Submission ####
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-## Import test dataset
+#### Import and tidy ####
+# Import test dataset
 competition.data <- read.csv("./Data/Raw/test.csv")
 
-## Tidy the data
+# Tidy the data
 source("./Code/Modeling/Data_Cleanser.R")
 competition.data <- clean_dataset(competition.data)
 
-## Process factor levels (re-bin small levels)
+# Process factor levels (re-bin small levels)
 source("./Code/Modeling/Data_Processor.R")
-competition.data <- align_factors_with_model(model = fit, new.data = competition.data)
+competition.data <- align_factors_with_model(model = model.rf, new.data = competition.data)
 
-## Generate schema for the training set
+
+
+
+#### Create feature matrix ####
+comp.features <- competition.data[, feature.list]
+
+# Apply feature engineering operations
+comp.features <- feature_engineering(feature.matrix = comp.features, neighborhood.ref.data = my.data)
+
+# Add Id back in
+comp.features$Id <- competition.data$Id
+
+
+
+
+
+#### Check competition data to ensure all features are present and correct ####
+# Generate schema for the training set
 source("./Code/Modeling/Feature_Engineering_Functions.R")
 model.schema <- capture_schema(features)
 
 # Check that all model features are in place
-model.check <- check_schema(new.data = competition.data, model.schema = model.schema)
+model.check <- check_schema(new.data = comp.features, model.schema = model.schema)
 
-
-
-## Last check, look for NAs in competition data
-data.types <- sapply(competition.data, class)
-na.investigate <- apply(competition.data, 2, function(x) length(which(is.na(x))))
+# Last check, look for NAs in competition data
+data.types <- sapply(comp.features, class)
+na.investigate <- apply(comp.features, 2, function(x) length(which(is.na(x))))
 data.summary.table <- data.frame(type = data.types, na.count = na.investigate)
-data.summary.table$in.model <- ifelse(row.names(data.summary.table) %in% names(fit$forest$xlevels), TRUE, FALSE)
+data.summary.table$in.model <- ifelse(row.names(data.summary.table) %in% names(model.rf$forest$xlevels), TRUE, FALSE)
 
 
 
@@ -205,17 +347,26 @@ data.summary.table$in.model <- ifelse(row.names(data.summary.table) %in% names(f
 
 
 
-## Run the prediction
-competition.data <- competition.data[, feature.list]
+#### Run the predictions ####
+
+# Individual Predictions
+comp.features$log.SalePrice.RF <- predict(model.rf, comp.features)
+comp.features$log.SalePrice.xgb <- predict(model.xgboost, data.matrix(comp.features))
+comp.features$log.SalePrice.LM <- predict(model.lm, comp.features)
+
+# Ensembles
+comp.features$log.SalePrice.stack.RF <- predict(stacked.model, comp.features)
+comp.features <- comp.features %>% mutate(log.SalePrice.mean.pred = (log.SalePrice.RF + log.SalePrice.xgb + log.SalePrice.LM) / 3)
 
 
-competition.data$log.SalePrice <- predict(fit, competition.data)
-
-competition.data <- competition.data %>% mutate(SalePrice = exp(competition.data$log.SalePrice)) %>%
+#### Format for submission ####
+comp.features <- comp.features %>% mutate(SalePrice = exp(comp.features$log.SalePrice.mean.pred)) %>%
   select(Id, SalePrice)
 
+
+
 ## Save the results
-write.csv(competition.data, file = "./Data/Submissions/Itr3_RF_Submission.csv",
+write.csv(comp.features, file = "./Data/Submissions/Itr5_StackedGeneralization_Submission.csv",
           row.names = FALSE)
 
 
