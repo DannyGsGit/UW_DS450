@@ -8,7 +8,7 @@ library(dplyr)
 library(ggplot2)
 
 
-set.seed(124)
+set.seed(1234)
 
 
 
@@ -74,55 +74,18 @@ qqplot_pairs <- function(column) {
 
 
 
-## Find nearest neighbors in tax records
+source("./Code/Processing/Tax_Matcher.R")
 
-# Get the tax valuation for a home
-nearest_tax_neighbor <- function(feature.dataset, tax.dataset) {
-  features.bridge <- feature.dataset %>%
-    mutate(ParcelId = 1:nrow(feature.dataset), source = "traindata") %>%
-    select(ParcelId, YearBuilt, GrLivArea, LotArea, Neighborhood)
-  
-  tax.bridge <- tax.dataset %>%
-    mutate(source = "taxdata") %>%
-    select(ParcelId, YearBuilt, GrLivArea, LotArea, Neighborhood)
-  
-  pca.data <- rbind(features.bridge, tax.bridge)
-  
-  match.keys <- c("YearBuilt", "GrLivArea", "LotArea")
-  
-  pca.data[, match.keys] <- scale(pca.data[, match.keys], center = TRUE, scale = TRUE)
-  
-  # Use PCA to generate match score based on tax records
-  match.rubric <- FactoMineR::PCA(pca.data[,match.keys])
-  
-  # Merge scores with pca data
-  pca.scores <- as.data.frame(match.rubric$ind$coord)
-  pca.scores$ParcelId <- pca.data$ParcelId
-  pca.data <- left_join(pca.data, pca.scores, by = "ParcelId")
-  
-  # Break up pca data and re-join with original data
-  pca.data <- pca.data %>% select(ParcelId, Dim.1, Dim.2, Dim.3)
-  colnames(pca.data) <- c("ParcelId", "PCA1", "PCA2", "PCA3")
-  
-  features.bridge <- left_join(features.bridge, pca.data, by = "ParcelId")
-  tax.dataset <- left_join(tax.dataset, pca.data, by = "ParcelId")
-  
-  measure_tax_distance <- function(input, tax.df) {
-    tax.df$PCA1.temp <- (input[1, "PCA1"] - tax.df$PCA1) ^ 2
-    tax.df$PCA2.temp <- (input[1, "PCA2"] - tax.df$PCA2) ^ 2
-    tax.df$PCA3.temp <- (input[1, "PCA3"] - tax.df$PCA3) ^ 2
-    tax.df$distance <- sqrt(tax.df$PCA1.temp + tax.df$PCA2.temp + tax.df$PCA3.temp)
-    
-    best.match <- tax.df$AssessedValue[which.min(tax.df$distance)]
-    
-    return(best.match)
-  }
-  
-  feature.dataset$est.2015.tax.valuation <- sapply(1:nrow(features.bridge), function(x) measure_tax_distance(features.bridge[x,], tax.dataset))
-  
-  return(feature.dataset)
-  
-}
+# Generate lookup table of tax assessment adjustments by neighborhood
+# e.g.: Homes sell for 1.2X tax assessment in neighborhood Z
+features.temp <- sapply(1:nrow(my.data), function(x) tax_matcher(tax.data, features[x, ], "AssessedValue"))
+features.temp <- data.frame(features, est.2015.tax.valuation = features.temp)
+
+tax.temp.data <- data.frame(my.data, tax.value = features.temp$est.2015.tax.valuation)
+neighborhood.tax.betas <- tax.temp.data %>% group_by(Neighborhood) %>%
+  summarise(mean.neighborhood.beta = mean(SalePrice / tax.value)) %>%
+  ungroup()
+
 
 # Adjust tax valuation by neighborhood multiplier
 neighborhood_tax_adjust <- function(feature.dataset, neighborhood.betas) {
@@ -136,20 +99,12 @@ neighborhood_tax_adjust <- function(feature.dataset, neighborhood.betas) {
 }
 
 
-# Generate lookup table of tax assessment adjustments by neighborhood
-# e.g.: Homes sell for 1.2X tax assessment in neighborhood Z
-features.temp <- nearest_tax_neighbor(features, tax.data)
-tax.temp.data <- data.frame(my.data, tax.value = features.temp$est.2015.tax.valuation)
-neighborhood.tax.betas <- tax.temp.data %>% group_by(Neighborhood) %>%
-  summarise(mean.neighborhood.beta = mean(SalePrice / tax.value)) %>%
-  ungroup()
-
-
-
 feature_engineering <- function(feature.matrix, neighborhood.ref.data, tax.dataset, neighborhood.tax.betas) {
   
   ## Add tax valuation
-  feature.matrix <- nearest_tax_neighbor(feature.matrix, tax.dataset)
+  tax.values <- sapply(1:nrow(feature.matrix), function(x) tax_matcher(tax.dataset, feature.matrix[x, ], "AssessedValue"))
+  feature.matrix<- data.frame(feature.matrix, est.2015.tax.valuation = tax.values)
+
   
   ## Adjusted tax valuation
   feature.matrix <- neighborhood_tax_adjust(feature.matrix, neighborhood.tax.betas)
@@ -212,7 +167,7 @@ features <- feature_engineering(feature.matrix = features,
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Split the data
-splits <- caret::createDataPartition(y = my.data$log.SalePrice, p = 0.7, list = FALSE)
+splits <- caret::createDataPartition(y = my.data$log.sale.price, p = 0.96, list = FALSE)
 
 train.features <- features[splits,]
 train.target <- target[splits]
@@ -324,8 +279,6 @@ test.data <- test.data %>% mutate(SalePrice.LM = exp(log.SalePrice.LM),
 ## Calculate RMSE
 RMSE.LM <- sqrt(mean(test.data$residuals.LM ^ 2))
 print(RMSE.LM)
-
-
 
 
 
@@ -464,7 +417,7 @@ comp.features <- comp.features %>% mutate(SalePrice = exp(comp.features$log.Sale
 
 
 ## Save the results
-write.csv(comp.features, file = "./Data/Submissions/Itr6_TaxValuation_Submission.csv",
+write.csv(comp.features, file = "./Data/Submissions/Itr7_ImprovedTaxValuation_Submission_2.csv",
           row.names = FALSE)
 
 
